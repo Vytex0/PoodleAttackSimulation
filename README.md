@@ -2,7 +2,7 @@
 
 Ce repository a pour but de visualiser le fonctionnement de l'attaque Poodle. Pour cela, trois classes (Client, Attaquant et Serveur) ont été créées afin de les simuler. On suppose dans notre cas que l'attaquant a déjà réalisé au préalable : 
 - une attaque Man In The Middle permettant d'écouter et de modifier les données qui transitent entre le client et le serveur
-- un script JS malicieux placé sur la page consulté par le client permettant à l'attaquant de faire envoyer par le client toute les requêtes qu'il souhaite (potentiellement via une faille XSS)
+- un script JS malicieux placé sur la page consultée par le client permettant à l'attaquant de faire envoyer par le client toutes les requêtes qu'il souhaite (potentiellement via une faille XSS)
 
 
 # Utilisation du Poc
