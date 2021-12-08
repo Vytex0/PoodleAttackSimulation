@@ -3,6 +3,7 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Hash import HMAC
 from Crypto import Random
+import time
 
 # source : https://www.openssl.org/~bodo/ssl-poodle.pdf
 # source : https://www.acunetix.com/blog/web-security-zone/what-is-poodle-attack/
@@ -21,7 +22,7 @@ def log(message, type="none", bold=False, underlined=False):
     if(bold):
         prefix += BOLD
 
-    if(type == "error"):
+    if(type == "warning"):
         print(prefix+ORANGE+message+ENDC)
     elif(type == "info"):
         print(prefix+BLUE+message+ENDC)
@@ -101,30 +102,40 @@ class Attacker:
         path = "/" # Path of the request (false path)
         body = "A"*lengthToDecrypt # Body of the request
 
+        log("---===---===---===---===---", "none", True)
+        log("  Rajout d'octets au body pour obtenir un bloc complet", "warning", True)
         # Find the correct body size to have last block full of padding
         # We know that the last block if full of padding when a new block is added (means that the length of padding has been put in the new block and is therefore intialized to AES.block_size (block size = AES.block_size))
         self.client.sendRequest(path, body)
         lastRequestSizeInBlock = len(self.lastRequest)//AES.block_size # 
         increaseBodySize = True
         while(increaseBodySize):
+            time.sleep(0.1)
             body = body + "A"
             self.client.sendRequest(path, body) # The requests is going to be handled in "Attacker.handleRequest" method
             newRequestSizeInBlock = len(self.lastRequest)//AES.block_size
+            log("    Body actuel : " + body)
+            log("     Nombre de blocs : " + str(newRequestSizeInBlock)+"\n", "", True)
             if(lastRequestSizeInBlock != newRequestSizeInBlock): # If the size has changed, it means that a new block has been added
                 increaseBodySize = False
             lastRequestSizeInBlock = newRequestSizeInBlock
-
+        
+        log("  Padding terminé", "success", True)
+        time.sleep(2)
 
         # This loop is used to decrypt each asked caracter
         for i in range(lengthToDecrypt):
+            time.sleep(0.25)
+            nbOfRequests = 0
             requestRejectedByServer = True # Registers if the server has validated the request or not
             while(requestRejectedByServer): # While the server rejects the request (because the MAC is not valid)
+                nbOfRequests += 1
                 self.client.sendRequest(path, body) # We make the client sending a new request (often thanks to a malicious JS script)
                 blockToDecrypt = self.lastRequest[(blockToDecryptNumber*AES.block_size):((blockToDecryptNumber+1)*AES.block_size)] # block to decrypt
                 newEncryptedRequest = self.lastRequest[:-AES.block_size] + blockToDecrypt # We remove the padding to replace it by the block to decrypt thanks to the fact that the padding is not included in the MAC
                 if(self.server.handleRequest(newEncryptedRequest)): # If the server accepts the new request
                     log("---===---===---===---===---", "none", True)
-                    log("  Decryption succeeded", "success", True)
+                    log("  Decryption succeeded in "+str(nbOfRequests)+" requests", "success", True)
                     requestRejectedByServer = False
                     blockBeforeToDecryptLastByte = newEncryptedRequest[blockToDecryptNumber*AES.block_size-1] # Last byte of the block just before the block to decrypt
                     blockBeforeLastBlockLastByte = newEncryptedRequest[-AES.block_size-1] # Last byte of the before last block
@@ -132,17 +143,18 @@ class Attacker:
                     decryptedLastCharOfBlockToDecrypt = chr(decryptedLastByteOfBlockToDecrypt) # Decrypted char
                     decryptedFullRequest += decryptedLastCharOfBlockToDecrypt # Add decrypted char to decrypted request
 
+                    log("  Path : "+path)
+                    log("  Body : "+body)
+                    log("  Character decrypted : '"+decryptedLastCharOfBlockToDecrypt+"'", "none", True)
+
                     body = body[:len(body)-1] # Decrease body length
                     path = path + "A" # Increase path length -> the two operations are made to shift the wanted informations to the right, in order to have the next wanted byte at the end of the blockToDecryptNumber block
-
-                    log("  Character decrypted : '"+decryptedLastCharOfBlockToDecrypt+"'")
 
         decryptedFullRequest = decryptedFullRequest[::-1] # We reverse the request because it has been decrypted in reverse
         log("===========================", "none", True)
         log("     END OF THE ATTACK", "none", True)
         log("   decryptedFullRequest = \""+decryptedFullRequest+"\"", "success", True)
         log("===========================", "none", True)
-
         return True
 
 # This class represents a client which connects to a server
